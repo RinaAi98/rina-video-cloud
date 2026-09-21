@@ -1,0 +1,6 @@
+__pycache__
+*.pyc
+.git
+.env
+creator/video/input
+creator/video/output
