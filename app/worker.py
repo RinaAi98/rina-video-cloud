@@ -1,5 +1,6 @@
 import os, time, tempfile
 from pathlib import Path
+from urllib.parse import quote
 import requests
 from rina_video.video_pipeline_v2 import VideoPipelineV2
 
@@ -28,15 +29,19 @@ def update(job_id,**fields):
     r.raise_for_status()
 
 def storage_get(bucket,path,dst):
-    url=f"{SUPABASE_URL}/storage/v1/object/{bucket}/{path}"
+    safe_path=quote(path.lstrip("/"),safe="/")
+    url=f"{SUPABASE_URL}/storage/v1/object/{quote(bucket,safe='')}/{safe_path}"
     with requests.get(url,headers=h(),stream=True,timeout=300) as r:
-        r.raise_for_status()
+        if r.status_code >= 400:
+            detail=r.text[:500].replace("\\n"," ")
+            raise RuntimeError(f"Storage GET {r.status_code}: {detail}")
         with open(dst,"wb") as f:
             for chunk in r.iter_content(1024*1024):
                 if chunk: f.write(chunk)
 
 def storage_put(bucket,path,src):
-    url=f"{SUPABASE_URL}/storage/v1/object/{bucket}/{path}"
+    safe_path=quote(path.lstrip("/"),safe="/")
+    url=f"{SUPABASE_URL}/storage/v1/object/{quote(bucket,safe='')}/{safe_path}"
     with open(src,"rb") as f:
         r=requests.post(url,headers={**h(),"Content-Type":"video/mp4"},data=f,timeout=600)
     r.raise_for_status()
