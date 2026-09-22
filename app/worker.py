@@ -47,11 +47,14 @@ def process_one():
     jid=job["id"]
     # Claim using status filter so two workers cannot process the same row.
     url=f"{SUPABASE_URL}/rest/v1/{JOBS_TABLE}"
-    r=requests.patch(url,headers={**h(),"Content-Type":"application/json"},
+    r=requests.patch(url,headers={**h(),"Content-Type":"application/json","Prefer":"return=representation"},
                      params={"id":f"eq.{jid}","status":"eq.QUEUED"},
                      json={"status":"PROCESSING","stage":"ANALYZING","progress":15},
                      timeout=30)
-    if r.status_code>=400 or r.text in ("[]",""):
+    if r.status_code>=400:
+        r.raise_for_status()
+    claimed=r.json()
+    if len(claimed)!=1:
         return False
     with tempfile.TemporaryDirectory(prefix="rina_video_") as td:
         src=Path(td)/"input.mp4"
