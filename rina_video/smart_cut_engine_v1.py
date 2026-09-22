@@ -28,12 +28,13 @@ class SmartCutEngineV1:
             text=self._trim_text(str(seg.get("text","")))
             if end<=start or not text: continue
             cuts.append({"start":round(start,3),"end":round(end,3),"duration":round(end-start,3),"text":text,
-                         "story_stage":seg.get("story_stage",""),"score":seg.get("score",0)})
+                         "story_stage":seg.get("story_stage",""),"score":seg.get("score",0),"speech_segments":seg.get("speech_segments",[])})
         merged=[]
         for cut in cuts:
             if merged and cut["start"]-merged[-1]["end"] <= 0.08 and cut.get("story_stage", "") == merged[-1].get("story_stage", ""):
                 merged[-1]["end"]=cut["end"]; merged[-1]["duration"]=round(merged[-1]["end"]-merged[-1]["start"],3)
                 merged[-1]["text"] += " " + cut["text"]
+                merged[-1]["speech_segments"] = merged[-1].get("speech_segments", []) + cut.get("speech_segments", [])
                 merged[-1]["story_stage"] += "+" + cut["story_stage"] if cut["story_stage"] else ""
             else: merged.append(cut.copy())
         total=sum(x["duration"] for x in merged)

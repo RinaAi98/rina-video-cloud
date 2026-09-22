@@ -40,7 +40,7 @@ class RenderPipelineV2:
         pan = 0.38 if index % 2 else -0.38
         return (zoom, pan, 20)
 
-    def _scene_filter(self, index, cut, caption_path=None, total=1):
+    def _scene_filter(self, index, cut, caption_path=None, total=1, caption_events=None):
         start = float(cut["start"]); end = float(cut["end"])
         duration = max(0.1, end - start)
         stage = str(cut.get("stage", cut.get("story_stage", "MAIN"))).upper()
@@ -52,7 +52,17 @@ class RenderPipelineV2:
         box = "0.88" if stage == "HOOK" else "0.72"
         filters = []
         if index == 0: filters.append("fade=t=in:st=0:d=0.14")
-        if text and caption_path:
+        if caption_events:
+            for event in caption_events:
+                event_text = self._wrap(event.get("text", ""), 24 if stage == "HOOK" else 29)
+                if not event_text: continue
+                st = max(0.0, float(event.get("start", 0.0)))
+                en = min(duration, float(event.get("end", duration)))
+                if en <= st: continue
+                escaped = str(event.get("path", "")).replace("\\", "\\\\")
+                enable = f"between(t\\,{st:.3f}\\,{en:.3f})"
+                filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={escaped}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-320:line_spacing=14:box=1:boxcolor=black@{box}:boxborderw=24:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='{enable}'")
+        elif text and caption_path:
             filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={caption_path}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-320:line_spacing=14:box=1:boxcolor=black@{box}:boxborderw=24:shadowcolor=black@0.8:shadowx=2:shadowy=2")
         if index == total - 1:
             filters.append(f"fade=t=out:st={max(0,duration-0.14):.3f}:d=0.14")
@@ -76,12 +86,25 @@ class RenderPipelineV2:
         paths = []
         for i, cut in enumerate(cuts):
             text = str(cut.get("text", "")).strip()
-            if text:
+            speech = cut.get("speech_segments", []) or []
+            events = []
+            for j, seg in enumerate(speech):
+                seg_text = str(seg.get("text", "")).strip()
+                st = max(float(cut["start"]), float(seg.get("start", cut["start"])))
+                en = min(float(cut["end"]), float(seg.get("end", cut["end"])))
+                if seg_text and en > st:
+                    cp = caption_dir / f"caption_{i}_{j}.txt"
+                    cp.write_text(self._wrap(seg_text, 24), encoding="utf-8")
+                    events.append({"path": cp, "start": st - float(cut["start"]), "end": en - float(cut["start"]), "text": seg_text})
+            if events:
+                paths.append(events)
+            elif text:
                 cp = caption_dir / f"caption_{i}.txt"
                 cp.write_text(self._wrap(text, 24), encoding="utf-8")
-                paths.append(cp)
-            else: paths.append(None)
-        filters = [self._scene_filter(i, c, str(paths[i]) if paths[i] else None, len(cuts))
+                paths.append([{"path": cp, "start": 0.0, "end": float(cut["end"]) - float(cut["start"]), "text": text}])
+            else:
+                paths.append([])
+        filters = [self._scene_filter(i, c, None, len(cuts), paths[i])
                    for i, c in enumerate(cuts)]
         cv = "".join(f"[v{i}]" for i in range(len(cuts)))
         ca = "".join(f"[a{i}]" for i in range(len(cuts)))

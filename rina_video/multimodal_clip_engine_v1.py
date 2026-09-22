@@ -59,6 +59,7 @@ class MultimodalClipEngineV1:
                     "score": scene["multimodal_score"],
                     "story_stage": "",
                     "visual_evidence": True,
+                    "speech_segments": scene.get("speech_segments", []),
                 }
                 candidates.append(item)
             candidates = sorted(candidates, key=lambda x:(-x["score"], x["start"]))[:8]
