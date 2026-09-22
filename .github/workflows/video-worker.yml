@@ -2,6 +2,12 @@ name: RINA Video Worker
 
 on:
   workflow_dispatch:
+    inputs:
+      self_test:
+        description: "Generate and process a tiny cloud E2E fixture"
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "*/5 * * * *"
 
@@ -32,6 +38,25 @@ jobs:
           sudo apt-get install -y ffmpeg
           python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements.txt
+
+      - name: Create E2E fixture
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.self_test == true }}
+        run: |
+          ffmpeg -y -f lavfi -i color=c=black:s=1080x1920:r=30 -f lavfi -i sine=frequency=440:sample_rate=48000 -t 8 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest /tmp/rina_e2e.mp4
+          python3 - <<'PY'
+          import os, requests
+          url=os.environ['SUPABASE_URL'].rstrip('/')
+          key=os.environ['SUPABASE_SERVICE_ROLE_KEY']
+          h={'apikey':key,'Authorization':f'Bearer {key}','Content-Type':'video/mp4'}
+          path='e2e-test/input.mp4'
+          with open('/tmp/rina_e2e.mp4','rb') as f:
+              r=requests.post(f'{url}/storage/v1/object/rina-video-inputs/{path}',headers=h,data=f,timeout=120)
+          r.raise_for_status()
+          j={'id':'e2e-test','status':'QUEUED','stage':'QUEUED','progress':5,'input_path':path}
+          r=requests.post(f'{url}/rest/v1/video_jobs',headers={**h,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},json=j,timeout=30)
+          r.raise_for_status()
+          print('E2E fixture uploaded and job queued')
+          PY
 
       - name: Process one queued video
         run: python3 -m app.worker_once
