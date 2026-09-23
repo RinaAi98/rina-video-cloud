@@ -9,9 +9,9 @@ class CaptionIntelligenceV1:
             word=str(w.get("word","")).strip()
             if not word: continue
             ws=float(w.get("start",0)); we=float(w.get("end",ws))
-            candidate=group+[word]
+            candidate_words=[x["word"] for x in group]+[word]
             too_long=group and (we-float(start))>max_duration
-            too_wide=group and len(" ".join(candidate))>max_chars
+            too_wide=group and len(" ".join(candidate_words))>max_chars
             if too_long or too_wide or len(group)>=max_words:
                 events.append(self._event(group,start,float(group[-1]["end"])))
                 group=[]; start=None
