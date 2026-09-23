@@ -7,7 +7,7 @@ from .effects_engine_v1 import EffectsEngineV1
 class RenderPipelineV2:
     """RINA Editor V3 bridge: source cuts + motion + captions + audio."""
 
-    VERSION = "RINA_RENDER_PIPELINE_V2_EDITOR_V3"
+    VERSION = "RINA_RENDER_PIPELINE_V2_EDITOR_V4"
     WIDTH = 1080
     HEIGHT = 1920
 
@@ -70,9 +70,10 @@ class RenderPipelineV2:
                 if en <= st: continue
                 escaped = str(event.get("path", "")).replace("\\", "\\\\")
                 enable = f"between(t\\,{st:.3f}\\,{en:.3f})"
-                filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={escaped}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-320:line_spacing=14:box=1:boxcolor=black@{box}:boxborderw=24:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='{enable}'")
+                pop = f"if(between(t\,{st:.3f}\,{min(en, st+0.12):.3f})\,{fontsize+8}\,{fontsize})"
+                filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={escaped}:fontcolor=white:fontsize='{pop}':x=(w-text_w)/2:y=h-text_h-300:line_spacing=10:box=1:boxcolor=black@{box}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2:enable='{enable}'")
         elif text and caption_path:
-            filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={caption_path}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-320:line_spacing=14:box=1:boxcolor=black@{box}:boxborderw=24:shadowcolor=black@0.8:shadowx=2:shadowy=2")
+            filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={caption_path}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-300:line_spacing=10:box=1:boxcolor=black@{box}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2")
         if index == total - 1:
             filters.append(f"fade=t=out:st={max(0,duration-0.14):.3f}:d=0.14")
         elif transition["out"]:
@@ -102,7 +103,7 @@ class RenderPipelineV2:
             for j, seg in enumerate(speech):
                 words = seg.get("words", []) or []
                 if words:
-                    for k in range(0, len(words), 4):
+                    for k in range(0, len(words), 3):
                         group = words[k:k+4]
                         seg_text = " ".join(str(w.get("word","")).strip() for w in group).strip()
                         st = max(float(cut["start"]), float(group[0].get("start", cut["start"])))
