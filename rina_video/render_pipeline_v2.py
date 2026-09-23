@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from .effects_engine_v1 import EffectsEngineV1
 from .caption_intelligence_v1 import CaptionIntelligenceV1
+from .caption_presentation_intelligence_v2 import CaptionPresentationIntelligenceV2
 
 
 class RenderPipelineV2:
@@ -17,6 +18,7 @@ class RenderPipelineV2:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.effects = EffectsEngineV1()
         self.captions = CaptionIntelligenceV1()
+        self.caption_presentation = CaptionPresentationIntelligenceV2()
 
     @staticmethod
     def _escape(text):
@@ -77,8 +79,14 @@ class RenderPipelineV2:
                 if en <= st: continue
                 escaped = str(event.get("path", "")).replace("\\", "\\\\")
                 enable = f"between(t\\,{st:.3f}\\,{en:.3f})"
-                pop = f"if(between(t\\,{st:.3f}\\,{min(en, st+0.12):.3f})\\,{fontsize+8}\\,{fontsize})"
-                filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={escaped}:fontcolor=white:fontsize='{pop}':x=(w-text_w)/2:y=h-text_h-300:line_spacing=10:box=1:boxcolor=black@{box}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2:enable='{enable}'")
+                pm = event.get("presentation", {}) or {}
+                psize = int(pm.get("font_size", fontsize))
+                pscale = float(pm.get("emphasis_scale", 1.0))
+                ppop = min(float(pm.get("pop_duration", 0.12)), en-st)
+                py = int(pm.get("position_y", 300))
+                pbox = float(pm.get("box_opacity", box))
+                pop = f"if(between(t\,{st:.3f}\,{min(en, st+ppop):.3f})\,{round(psize*pscale)}\,{psize})"
+                filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={escaped}:fontcolor=white:fontsize='{pop}':x=(w-text_w)/2:y=h-text_h-{py}:line_spacing=10:box=1:boxcolor=black@{pbox:.2f}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2:enable='{enable}'")
         elif text and caption_path:
             filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={caption_path}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-300:line_spacing=10:box=1:boxcolor=black@{box}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2")
         if index == total - 1:
@@ -118,7 +126,9 @@ class RenderPipelineV2:
                         if seg_text and en > st:
                             cp = caption_dir / f"caption_{i}_{j}_{k}.txt"
                             cp.write_text(self._wrap(seg_text, 24), encoding="utf-8")
-                            events.append({"path": cp, "start": st - float(cut["start"]), "end": en - float(cut["start"]), "text": seg_text, "emphasis": event.get("emphasis")})
+                            ev = {"path": cp, "start": st - float(cut["start"]), "end": en - float(cut["start"]), "text": seg_text, "emphasis": event.get("emphasis")}
+                            ev["presentation"] = self.caption_presentation.present(ev, cut)
+                            events.append(ev)
                     continue
                 seg_text = str(seg.get("text", "")).strip()
                 st = max(float(cut["start"]), float(seg.get("start", cut["start"])))
