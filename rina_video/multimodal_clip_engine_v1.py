@@ -4,7 +4,7 @@ from pathlib import Path
 from .transcription_engine_v1 import TranscriptionEngineV1
 from .visual_scene_analyzer_v1 import VisualSceneAnalyzerV1
 from .semantic_clip_selector_v1 import SemanticClipSelectorV1
-from .smart_cut_engine_v1 import SmartCutEngineV1
+from .smart_cut_engine_v3 import SmartCutEngineV3
 
 class MultimodalClipEngineV1:
     VERSION = "RINA_MULTIMODAL_CLIP_ENGINE_V1"
@@ -13,7 +13,7 @@ class MultimodalClipEngineV1:
         self.transcriber = TranscriptionEngineV1()
         self.visual = VisualSceneAnalyzerV1()
         self.semantic = SemanticClipSelectorV1()
-        self.cutter = SmartCutEngineV1()
+        self.cutter = SmartCutEngineV3()
 
     def _overlap(self, a, b):
         return max(0.0, min(a["end"], b["end"]) - max(a["start"], b["start"]))
@@ -65,7 +65,8 @@ class MultimodalClipEngineV1:
             candidates = sorted(candidates, key=lambda x:(-x["score"], x["start"]))[:8]
             candidates.sort(key=lambda x:x["start"])
             mode = "visual_fallback"
-        cut = self.cutter.build(candidates, 45.0, 60.0)
+        source_duration = max([float(x.get("end",0)) for x in visual.get("scenes", [])] + [float(x.get("end",0)) for x in transcript_segments] + [0.0])
+        cut = self.cutter.build(candidates, source_duration, 45.0, 60.0)
         result = {
             "version": self.VERSION, "status": "READY" if cut["status"] == "READY" else cut["status"],
             "source": str(source), "mode": mode,
