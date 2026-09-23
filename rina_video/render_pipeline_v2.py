@@ -61,7 +61,7 @@ class RenderPipelineV2:
         fontsize = 58 if stage == "HOOK" else (48 if stage == "PAYOFF" else 44)
         box = "0.88" if stage == "HOOK" else "0.72"
         filters = []
-        transition = self.effects.transition(index, total)
+        transition = {"in": False, "out": False} if cut.get("micro_cut") else self.effects.transition(index, total)
         if index == 0:
             filters.append("fade=t=in:st=0:d=0.14")
         elif transition["in"]:
@@ -109,7 +109,7 @@ class RenderPipelineV2:
                 words = seg.get("words", []) or []
                 if words:
                     for k in range(0, len(words), 3):
-                        group = words[k:k+4]
+                        group = words[k:k+3]
                         seg_text = " ".join(str(w.get("word","")).strip() for w in group).strip()
                         st = max(float(cut["start"]), float(group[0].get("start", cut["start"])))
                         en = min(float(cut["end"]), float(group[-1].get("end", cut["end"])))

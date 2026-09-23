@@ -40,9 +40,15 @@ class VideoPipelineV2:
             job["edl"] = self.edl.build(job["cut_plan"], str(source))
             cuts = job["cut_plan"].get("cut_plan", [])
             job["pacing"] = self.pacing.analyze(cuts)
+            micro_cuts = job["pacing"].get("micro_cuts", [])
+            if micro_cuts:
+                job["cut_plan"]["cut_plan"] = micro_cuts
+                job["cut_plan"]["micro_paced"] = True
+                cuts = micro_cuts
+                job["edl"] = self.edl.build(job["cut_plan"], str(source))
             job.update(stage="RENDERING", progress=55)
             self._save(job)
-            render = self.renderer.render(source, analysis["cut_plan"], job_id)
+            render = self.renderer.render(source, job["cut_plan"], job_id)
             output = render.get("video") or render.get("output") or render.get("output_path")
             if not output:
                 raise RuntimeError("Renderer tidak mengembalikan file output.")
