@@ -50,6 +50,11 @@ class RenderPipelineV2:
         effect = self.effects.profile(stage, index, total)
         zoom = effect["zoom"]
         speed = effect["pan_speed"]
+        # Long continuous shots need stronger micro-pacing, but remain evidence-only.
+        if duration >= 20:
+            speed *= 1.22
+        elif duration >= 10:
+            speed *= 1.10
         amp = effect["pan_amp"]
         x = f"(iw-1080)/2+sin(t*{speed})*{amp}"
         y = "(ih-1920)/2+cos(t*0.42)*16"
@@ -70,7 +75,7 @@ class RenderPipelineV2:
                 if en <= st: continue
                 escaped = str(event.get("path", "")).replace("\\", "\\\\")
                 enable = f"between(t\\,{st:.3f}\\,{en:.3f})"
-                pop = f"if(between(t\,{st:.3f}\,{min(en, st+0.12):.3f})\,{fontsize+8}\,{fontsize})"
+                pop = f"if(between(t\\,{st:.3f}\\,{min(en, st+0.12):.3f})\\,{fontsize+8}\\,{fontsize})"
                 filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={escaped}:fontcolor=white:fontsize='{pop}':x=(w-text_w)/2:y=h-text_h-300:line_spacing=10:box=1:boxcolor=black@{box}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2:enable='{enable}'")
         elif text and caption_path:
             filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={caption_path}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-300:line_spacing=10:box=1:boxcolor=black@{box}:boxborderw=20:shadowcolor=black@0.85:shadowx=2:shadowy=2")
