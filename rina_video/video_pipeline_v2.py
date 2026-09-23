@@ -11,6 +11,7 @@ from .pacing_engine_v1 import PacingEngineV1
 from .visual_intelligence_v2 import VisualIntelligenceV2
 from .audio_intelligence_v2 import AudioIntelligenceV2
 from .semantic_editor_intelligence_v1 import SemanticEditorIntelligenceV1
+from .retention_rhythm_engine_v1 import RetentionRhythmEngineV1
 
 class VideoPipelineV2:
     VERSION = "RINA_VIDEO_PIPELINE_V2_APK"
@@ -25,6 +26,7 @@ class VideoPipelineV2:
         self.visual_intel = VisualIntelligenceV2()
         self.audio_intel = AudioIntelligenceV2()
         self.semantic_editor = SemanticEditorIntelligenceV1()
+        self.rhythm = RetentionRhythmEngineV1()
 
     def _save(self, job):
         path = self.job_dir / f"{job['job_id']}.json"
@@ -64,6 +66,12 @@ class VideoPipelineV2:
                 job["cut_plan"]["cut_plan"] = selected
                 cuts = selected
                 job["pacing"] = self.pacing.analyze(cuts)
+                job["edl"] = self.edl.build(job["cut_plan"], str(source))
+            rhythm = self.rhythm.analyze(cuts)
+            job["retention_rhythm"] = rhythm
+            if rhythm.get("status") == "READY":
+                job["cut_plan"]["cut_plan"] = rhythm["cuts"]
+                cuts = rhythm["cuts"]
                 job["edl"] = self.edl.build(job["cut_plan"], str(source))
             job.update(stage="RENDERING", progress=55)
             self._save(job)

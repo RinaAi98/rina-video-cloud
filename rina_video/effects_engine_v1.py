@@ -5,18 +5,19 @@ class EffectsEngineV1:
     VERSION = "RINA_EFFECTS_V1"
 
     def profile(self, role: str, index: int, total: int) -> dict:
+        if isinstance(role, dict):
+            energy=float(role.get("visual_energy",0) or 0)
+            rhythm=float(role.get("rhythm_factor",1.0) or 1.0)
+            idx=int(role.get("micro_index",index) or index)
+            return {"zoom": 1.035 + min(0.035, energy/3000.0) + (idx % 2)*0.008 + max(0.0, rhythm-1.0)*0.015,
+                    "pan_speed": (0.34 + min(0.18, energy/450.0)) * rhythm,
+                    "pan_amp": 12 + min(16, energy/6.0) + max(0.0, rhythm-1.0)*8,
+                    "brightness": -0.01}
         role = str(role or "MAIN").upper()
         if role == "HOOK":
             return {"zoom": 1.10, "pan_speed": 0.58, "pan_amp": 28, "brightness": -0.01}
         if role == "PAYOFF":
             return {"zoom": 1.06, "pan_speed": 0.42, "pan_amp": 18, "brightness": 0.0}
-        if isinstance(role, dict):
-            energy=float(role.get("visual_energy",0) or 0)
-            idx=int(role.get("micro_index",index) or index)
-            return {"zoom": 1.035 + min(0.035, energy/3000.0) + (idx % 2)*0.008,
-                    "pan_speed": 0.34 + min(0.18, energy/450.0),
-                    "pan_amp": 12 + min(16, energy/6.0),
-                    "brightness": -0.01}
         return {"zoom": 1.04 + (index % 2) * 0.015,
                 "pan_speed": 0.38, "pan_amp": 14, "brightness": -0.01}
 
