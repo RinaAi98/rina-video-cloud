@@ -124,7 +124,7 @@ class RenderPipelineV2:
         graph += f"{ca}concat=n={len(cuts)}:v=0:a=1[outa]"
         cmd = ["ffmpeg", "-y", "-i", str(source), "-filter_complex", graph,
                "-map", "[outv]", "-map", "[outa]", "-c:v", "libx264",
-               "-preset", "veryfast", "-crf", "20", "-threads", "0",
+               "-preset", "veryfast", "-crf", "18", "-threads", "0",
                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
                "-ar", "48000", "-movflags", "+faststart", str(output)]
         result = subprocess.run(cmd, capture_output=True, text=True)
