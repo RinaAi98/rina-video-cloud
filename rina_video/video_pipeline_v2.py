@@ -8,6 +8,7 @@ from .render_pipeline_v2 import RenderPipelineV2
 from .qc_engine import VideoQCEngine
 from .edit_decision_list_v1 import EditDecisionListV1
 from .pacing_engine_v1 import PacingEngineV1
+from .visual_intelligence_v2 import VisualIntelligenceV2
 
 class VideoPipelineV2:
     VERSION = "RINA_VIDEO_PIPELINE_V2_APK"
@@ -19,6 +20,7 @@ class VideoPipelineV2:
         self.qc = VideoQCEngine(min_duration=45, max_duration=60)
         self.edl = EditDecisionListV1()
         self.pacing = PacingEngineV1()
+        self.visual_intel = VisualIntelligenceV2()
 
     def _save(self, job):
         path = self.job_dir / f"{job['job_id']}.json"
@@ -40,8 +42,11 @@ class VideoPipelineV2:
             job["edl"] = self.edl.build(job["cut_plan"], str(source))
             cuts = job["cut_plan"].get("cut_plan", [])
             job["pacing"] = self.pacing.analyze(cuts)
+            job["visual_intelligence"] = self.visual_intel.analyze(source)
             micro_cuts = job["pacing"].get("micro_cuts", [])
             if micro_cuts:
+                micro_cuts = self.visual_intel.annotate_micro_cuts(micro_cuts, job["visual_intelligence"])
+                job["pacing"]["micro_cuts"] = micro_cuts
                 job["cut_plan"]["cut_plan"] = micro_cuts
                 job["cut_plan"]["micro_paced"] = True
                 cuts = micro_cuts

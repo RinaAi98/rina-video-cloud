@@ -47,7 +47,7 @@ class RenderPipelineV2:
         duration = max(0.1, end - start)
         stage = str(cut.get("stage", cut.get("story_stage", "MAIN"))).upper()
         text = self._wrap(cut.get("text", ""), 24 if stage == "HOOK" else 29)
-        effect = self.effects.profile(stage, index, total)
+        effect = self.effects.profile(cut if cut.get("micro_cut") else stage, index, total)
         zoom = effect["zoom"]
         speed = effect["pan_speed"]
         # Long continuous shots need stronger micro-pacing, but remain evidence-only.
