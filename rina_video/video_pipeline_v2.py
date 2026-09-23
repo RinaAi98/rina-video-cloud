@@ -10,6 +10,7 @@ from .edit_decision_list_v1 import EditDecisionListV1
 from .pacing_engine_v1 import PacingEngineV1
 from .visual_intelligence_v2 import VisualIntelligenceV2
 from .audio_intelligence_v2 import AudioIntelligenceV2
+from .semantic_editor_intelligence_v1 import SemanticEditorIntelligenceV1
 
 class VideoPipelineV2:
     VERSION = "RINA_VIDEO_PIPELINE_V2_APK"
@@ -23,6 +24,7 @@ class VideoPipelineV2:
         self.pacing = PacingEngineV1()
         self.visual_intel = VisualIntelligenceV2()
         self.audio_intel = AudioIntelligenceV2()
+        self.semantic_editor = SemanticEditorIntelligenceV1()
 
     def _save(self, job):
         path = self.job_dir / f"{job['job_id']}.json"
@@ -54,6 +56,14 @@ class VideoPipelineV2:
                 job["cut_plan"]["cut_plan"] = micro_cuts
                 job["cut_plan"]["micro_paced"] = True
                 cuts = micro_cuts
+                job["edl"] = self.edl.build(job["cut_plan"], str(source))
+            job["semantic_editor"] = self.semantic_editor.select(cuts, min_seconds=45.0, max_seconds=60.0)
+            selected = job["semantic_editor"].get("selection", [])
+            if selected and len(selected) != len(cuts):
+                selected.sort(key=lambda x: x.get("editor_index", 0))
+                job["cut_plan"]["cut_plan"] = selected
+                cuts = selected
+                job["pacing"] = self.pacing.analyze(cuts)
                 job["edl"] = self.edl.build(job["cut_plan"], str(source))
             job.update(stage="RENDERING", progress=55)
             self._save(job)
