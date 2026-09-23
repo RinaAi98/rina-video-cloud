@@ -2,6 +2,7 @@ import subprocess
 import json
 from pathlib import Path
 from .effects_engine_v1 import EffectsEngineV1
+from .caption_intelligence_v1 import CaptionIntelligenceV1
 
 
 class RenderPipelineV2:
@@ -15,6 +16,7 @@ class RenderPipelineV2:
         self.output_dir = Path("creator/video/output/rendered")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.effects = EffectsEngineV1()
+        self.captions = CaptionIntelligenceV1()
 
     @staticmethod
     def _escape(text):
@@ -108,15 +110,15 @@ class RenderPipelineV2:
             for j, seg in enumerate(speech):
                 words = seg.get("words", []) or []
                 if words:
-                    for k in range(0, len(words), 3):
-                        group = words[k:k+3]
-                        seg_text = " ".join(str(w.get("word","")).strip() for w in group).strip()
-                        st = max(float(cut["start"]), float(group[0].get("start", cut["start"])))
-                        en = min(float(cut["end"]), float(group[-1].get("end", cut["end"])))
+                    grouped = self.captions.group(words, max_words=4, max_chars=28, max_duration=2.2).get("events", [])
+                    for k, event in enumerate(grouped):
+                        seg_text = str(event.get("text", "")).strip()
+                        st = max(float(cut["start"]), float(event.get("start", cut["start"])))
+                        en = min(float(cut["end"]), float(event.get("end", cut["end"])))
                         if seg_text and en > st:
                             cp = caption_dir / f"caption_{i}_{j}_{k}.txt"
                             cp.write_text(self._wrap(seg_text, 24), encoding="utf-8")
-                            events.append({"path": cp, "start": st - float(cut["start"]), "end": en - float(cut["start"]), "text": seg_text})
+                            events.append({"path": cp, "start": st - float(cut["start"]), "end": en - float(cut["start"]), "text": seg_text, "emphasis": event.get("emphasis")})
                     continue
                 seg_text = str(seg.get("text", "")).strip()
                 st = max(float(cut["start"]), float(seg.get("start", cut["start"])))
