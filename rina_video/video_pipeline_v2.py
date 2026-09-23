@@ -7,6 +7,7 @@ from .multimodal_clip_engine_v1 import MultimodalClipEngineV1
 from .render_pipeline_v2 import RenderPipelineV2
 from .qc_engine import VideoQCEngine
 from .edit_decision_list_v1 import EditDecisionListV1
+from .pacing_engine_v1 import PacingEngineV1
 
 class VideoPipelineV2:
     VERSION = "RINA_VIDEO_PIPELINE_V2_APK"
@@ -17,6 +18,7 @@ class VideoPipelineV2:
         self.renderer = RenderPipelineV2()
         self.qc = VideoQCEngine(min_duration=45, max_duration=60)
         self.edl = EditDecisionListV1()
+        self.pacing = PacingEngineV1()
 
     def _save(self, job):
         path = self.job_dir / f"{job['job_id']}.json"
@@ -36,6 +38,8 @@ class VideoPipelineV2:
             job["analysis_mode"] = analysis.get("mode")
             job["cut_plan"] = analysis.get("cut_plan", {})
             job["edl"] = self.edl.build(job["cut_plan"], str(source))
+            cuts = job["cut_plan"].get("cut_plan", [])
+            job["pacing"] = self.pacing.analyze(cuts)
             job.update(stage="RENDERING", progress=55)
             self._save(job)
             render = self.renderer.render(source, analysis["cut_plan"], job_id)

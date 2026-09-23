@@ -1,6 +1,7 @@
 import subprocess
 import json
 from pathlib import Path
+from .effects_engine_v1 import EffectsEngineV1
 
 
 class RenderPipelineV2:
@@ -13,6 +14,7 @@ class RenderPipelineV2:
     def __init__(self):
         self.output_dir = Path("creator/video/output/rendered")
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.effects = EffectsEngineV1()
 
     @staticmethod
     def _escape(text):
@@ -45,13 +47,20 @@ class RenderPipelineV2:
         duration = max(0.1, end - start)
         stage = str(cut.get("stage", cut.get("story_stage", "MAIN"))).upper()
         text = self._wrap(cut.get("text", ""), 24 if stage == "HOOK" else 29)
-        zoom, speed, amp = self._motion(stage, index)
+        effect = self.effects.profile(stage, index, total)
+        zoom = effect["zoom"]
+        speed = effect["pan_speed"]
+        amp = effect["pan_amp"]
         x = f"(iw-1080)/2+sin(t*{speed})*{amp}"
         y = "(ih-1920)/2+cos(t*0.42)*16"
         fontsize = 58 if stage == "HOOK" else (48 if stage == "PAYOFF" else 44)
         box = "0.88" if stage == "HOOK" else "0.72"
         filters = []
-        if index == 0: filters.append("fade=t=in:st=0:d=0.14")
+        transition = self.effects.transition(index, total)
+        if index == 0:
+            filters.append("fade=t=in:st=0:d=0.14")
+        elif transition["in"]:
+            filters.append("fade=t=in:st=0:d=0.12")
         if caption_events:
             for event in caption_events:
                 event_text = self._wrap(event.get("text", ""), 24 if stage == "HOOK" else 29)
@@ -66,6 +75,8 @@ class RenderPipelineV2:
             filters.append(f"drawtext=fontfile=/system/fonts/Roboto-Bold.ttf:textfile={caption_path}:fontcolor=white:fontsize={fontsize}:x=(w-text_w)/2:y=h-text_h-320:line_spacing=14:box=1:boxcolor=black@{box}:boxborderw=24:shadowcolor=black@0.8:shadowx=2:shadowy=2")
         if index == total - 1:
             filters.append(f"fade=t=out:st={max(0,duration-0.14):.3f}:d=0.14")
+        elif transition["out"]:
+            filters.append(f"fade=t=out:st={max(0,duration-0.12):.3f}:d=0.12")
         extra = ("," + ",".join(filters)) if filters else ""
         return (f"[0:v]trim=start={start:.3f}:end={end:.3f},setpts=PTS-STARTPTS,"
                 "scale=1080:1920:force_original_aspect_ratio=increase,"
