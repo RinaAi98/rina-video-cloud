@@ -89,6 +89,18 @@ class RenderPipelineV2:
             speech = cut.get("speech_segments", []) or []
             events = []
             for j, seg in enumerate(speech):
+                words = seg.get("words", []) or []
+                if words:
+                    for k in range(0, len(words), 4):
+                        group = words[k:k+4]
+                        seg_text = " ".join(str(w.get("word","")).strip() for w in group).strip()
+                        st = max(float(cut["start"]), float(group[0].get("start", cut["start"])))
+                        en = min(float(cut["end"]), float(group[-1].get("end", cut["end"])))
+                        if seg_text and en > st:
+                            cp = caption_dir / f"caption_{i}_{j}_{k}.txt"
+                            cp.write_text(self._wrap(seg_text, 24), encoding="utf-8")
+                            events.append({"path": cp, "start": st - float(cut["start"]), "end": en - float(cut["start"]), "text": seg_text})
+                    continue
                 seg_text = str(seg.get("text", "")).strip()
                 st = max(float(cut["start"]), float(seg.get("start", cut["start"])))
                 en = min(float(cut["end"]), float(seg.get("end", cut["end"])))

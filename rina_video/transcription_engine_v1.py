@@ -51,20 +51,26 @@ class TranscriptionEngineV1:
                     self.ENDPOINT,
                     headers=headers,
                     files={"file": (audio.name, fh, "audio/flac")},
-                    data={"model": self.MODEL, "language": self.language,
-                          "response_format": "verbose_json",
-                          "timestamp_granularities[]": "segment",
-                          "temperature": "0.0"},
+                    data=[("model", self.MODEL), ("language", self.language),
+                          ("response_format", "verbose_json"),
+                          ("timestamp_granularities[]", "segment"),
+                          ("timestamp_granularities[]", "word"),
+                          ("temperature", "0.0")],
                     timeout=180)
             if response.status_code >= 400:
                 return {"status": "ERROR", "reason":
                         f"Groq HTTP {response.status_code}: {response.text[:1000]}"}
             result = response.json()
+            word_items = result.get("words", []) or []
             segments = []
             for item in result.get("segments", []) or []:
-                segments.append({"start": float(item.get("start", 0)),
-                                 "end": float(item.get("end", 0)),
-                                 "text": str(item.get("text", "")).strip()})
+                start = float(item.get("start", 0)); end = float(item.get("end", 0))
+                words = [{"start":float(w.get("start",0)), "end":float(w.get("end",0)),
+                          "word":str(w.get("word","")).strip()}
+                         for w in word_items
+                         if float(w.get("end",0)) > start and float(w.get("start",0)) < end]
+                segments.append({"start":start, "end":end,
+                                 "text":str(item.get("text", "")).strip(), "words":words})
             return {"status": "READY", "model": self.MODEL,
                     "language": self.language, "text": str(result.get("text", "")).strip(),
                     "segments": segments}
