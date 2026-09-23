@@ -5,6 +5,7 @@ from .transcription_engine_v1 import TranscriptionEngineV1
 from .visual_scene_analyzer_v1 import VisualSceneAnalyzerV1
 from .semantic_clip_selector_v1 import SemanticClipSelectorV1
 from .smart_cut_engine_v3 import SmartCutEngineV3
+from .visual_hook_engine_v3 import VisualHookEngineV3
 
 class MultimodalClipEngineV1:
     VERSION = "RINA_MULTIMODAL_CLIP_ENGINE_V1"
@@ -14,6 +15,7 @@ class MultimodalClipEngineV1:
         self.visual = VisualSceneAnalyzerV1()
         self.semantic = SemanticClipSelectorV1()
         self.cutter = SmartCutEngineV3()
+        self.visual_hook = VisualHookEngineV3()
 
     def _overlap(self, a, b):
         return max(0.0, min(a["end"], b["end"]) - max(a["start"], b["start"]))
@@ -41,13 +43,20 @@ class MultimodalClipEngineV1:
             transcript = self.transcriber.transcribe(source)
         visual = self.visual.analyze(source, threshold)
         ranked = self._visualize(visual["scenes"], transcript)
+        visual_hook = self.visual_hook.analyze(source)
+        visual_candidates = self.visual_hook.candidates(visual_hook)
         transcript_segments = transcript.get("segments", [])
         semantic = self.semantic.select(transcript_segments, max_segments=8,
                                          min_total_seconds=20, max_total_seconds=60)
                 # Sparse speech fallback: use real visual shots, never fabricate dialogue.
         if semantic["status"] == "READY":
-            candidates = semantic["selected_segments"]
-            mode = "speech_semantic"
+            candidates = list(semantic["selected_segments"])
+            for vc in visual_candidates:
+                overlaps=[x for x in transcript_segments if self._overlap(vc,x)>0]
+                vc["speech_segments"]=overlaps
+                vc["text"]=" ".join(str(x.get("text","")).strip() for x in overlaps).strip()
+                candidates.append(vc)
+            mode = "multimodal_speech_visual"
         else:
             candidates = []
             for scene in ranked:
@@ -62,7 +71,8 @@ class MultimodalClipEngineV1:
                     "speech_segments": scene.get("speech_segments", []),
                 }
                 candidates.append(item)
-            candidates = sorted(candidates, key=lambda x:(-x["score"], x["start"]))[:8]
+            candidates.extend(visual_candidates)
+            candidates = sorted(candidates, key=lambda x:(-float(x.get("visual_score",x.get("score",0))), x["start"]))[:12]
             candidates.sort(key=lambda x:x["start"])
             mode = "visual_fallback"
         source_duration = max([float(x.get("end",0)) for x in visual.get("scenes", [])] + [float(x.get("end",0)) for x in transcript_segments] + [0.0])
@@ -71,8 +81,8 @@ class MultimodalClipEngineV1:
             "version": self.VERSION, "status": "READY" if cut["status"] == "READY" else cut["status"],
             "source": str(source), "mode": mode,
             "transcript": transcript, "visual": visual,
-            "ranked_visual_scenes": ranked, "semantic_selection": semantic,
-            "cut_plan": cut, "fabrication_policy": "NO_INVENTED_SPEECH_OR_STORY",
+            "ranked_visual_scenes": ranked, "visual_hook": visual_hook,
+            "semantic_selection": semantic, "cut_plan": cut, "fabrication_policy": "NO_INVENTED_SPEECH_OR_STORY",
         }
         out = Path("creator/video/output/jobs")
         out.mkdir(parents=True, exist_ok=True)

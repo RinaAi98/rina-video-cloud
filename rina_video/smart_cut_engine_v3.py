@@ -14,9 +14,11 @@ class SmartCutEngineV3:
     def _anchor_score(self, item: dict[str, Any]) -> float:
         text = str(item.get("text","")).strip()
         words = self._words(text)
-        if not words: return float(item.get("score",0) or 0) * 0.35
+        if not words: return min(100.0, float(item.get("visual_score", item.get("score",0)) or 0) * 0.7)
         low = set(words)
-        score = float(item.get("score",0) or 0) * 0.45
+        visual = float(item.get("visual_score", item.get("score",0)) or 0)
+        base = float(item.get("score",0) or 0)
+        score = visual * 0.42 + base * 0.23
         score += min(28, len(low & self.ATTENTION) * 8)
         score += min(12, len(low & self.CONTRAST) * 6)
         if "?" in text: score += 12
