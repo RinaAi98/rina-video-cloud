@@ -4,6 +4,7 @@ from pathlib import Path
 from .effects_engine_v1 import EffectsEngineV1
 from .caption_intelligence_v1 import CaptionIntelligenceV1
 from .caption_presentation_intelligence_v2 import CaptionPresentationIntelligenceV2
+from .audio_mastering_v2 import AudioMasteringV2
 
 
 class RenderPipelineV2:
@@ -19,6 +20,7 @@ class RenderPipelineV2:
         self.effects = EffectsEngineV1()
         self.captions = CaptionIntelligenceV1()
         self.caption_presentation = CaptionPresentationIntelligenceV2()
+        self.audio_mastering = AudioMasteringV2()
 
     @staticmethod
     def _escape(text):
@@ -102,7 +104,7 @@ class RenderPipelineV2:
                 f"[0:a]atrim=start={start:.3f}:end={end:.3f},asetpts=PTS-STARTPTS,"
                 f"aformat=sample_rates=48000:channel_layouts=stereo[a{index}]")
 
-    def render(self, source, cut_plan, job_id="render_v2"):
+    def render(self, source, cut_plan, job_id="render_v2", audio_analysis=None):
         source = Path(source)
         if not source.exists(): raise FileNotFoundError(source)
         cuts = cut_plan.get("cut_plan", cut_plan) if isinstance(cut_plan, dict) else cut_plan
@@ -151,17 +153,19 @@ class RenderPipelineV2:
         ca = "".join(f"[a{i}]" for i in range(len(cuts)))
         graph = ";".join(filters) + ";" + f"{cv}concat=n={len(cuts)}:v=1:a=0[outv];"
         graph += f"{ca}concat=n={len(cuts)}:v=0:a=1[outa]"
+        mastering = self.audio_mastering.profile(audio_analysis)
         cmd = ["ffmpeg", "-y", "-i", str(source), "-filter_complex", graph,
                "-map", "[outv]", "-map", "[outa]", "-c:v", "libx264",
                "-preset", "veryfast", "-crf", "18", "-threads", "0",
-               "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+               "-pix_fmt", "yuv420p", "-af", mastering["filter"], "-c:a", "aac", "-b:a", "160k",
                "-ar", "48000", "-movflags", "+faststart", str(output)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError("FFmpeg gagal:\n" + result.stderr[-5000:])
         return {"version": self.VERSION, "video": str(output), "shots": len(cuts),
                 "duration": round(sum(float(c["end"])-float(c["start"]) for c in cuts), 3),
-                "stages": [c.get("stage", c.get("story_stage", "MAIN")) for c in cuts]}
+                "stages": [c.get("stage", c.get("story_stage", "MAIN")) for c in cuts],
+                "audio_mastering": mastering}
 
     def save_manifest(self, result, path):
         target = Path(path); target.parent.mkdir(parents=True, exist_ok=True)
