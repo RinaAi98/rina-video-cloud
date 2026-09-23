@@ -43,21 +43,40 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.self_test == true }}
         run: |
           ffmpeg -y -f lavfi -i color=c=black:s=1080x1920:r=30 -f lavfi -i sine=frequency=440:sample_rate=48000 -t 50 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest /tmp/rina_e2e.mp4
+          export E2E_ID="e2e-test-${GITHUB_RUN_ID}"
           python3 - <<'PY'
           import os, requests
           url=os.environ['SUPABASE_URL'].rstrip('/')
           key=os.environ['SUPABASE_SERVICE_ROLE_KEY']
-          h={'apikey':key,'Authorization':f'Bearer {key}','Content-Type':'video/mp4'}
-          path='e2e-test-50/input.mp4'
+          h={'apikey':key,'Authorization':f'Bearer {key}','Content-Type':'video/mp4','x-upsert':'true'}
+          job_id=os.environ['E2E_ID']
+          path=f'{job_id}/input.mp4'
           with open('/tmp/rina_e2e.mp4','rb') as f:
               r=requests.post(f'{url}/storage/v1/object/rina-video-inputs/{path}',headers=h,data=f,timeout=120)
           r.raise_for_status()
-          j={'id':'e2e-test-50','status':'QUEUED','stage':'QUEUED','progress':5,'input_path':path}
+          j={'id':job_id,'status':'QUEUED','stage':'QUEUED','progress':5,'input_path':path}
           r=requests.post(f'{url}/rest/v1/video_jobs',headers={**h,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},json=j,timeout=30)
           r.raise_for_status()
-          print('E2E fixture uploaded and job queued')
+          print('E2E fixture uploaded and job queued:', job_id)
           PY
 
       - name: Process one queued video
         run: python3 -m app.worker_once
+
+      - name: Verify E2E result
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.self_test == true }}
+        run: |
+          python3 - <<'PY'
+          import os, requests
+          url=os.environ['SUPABASE_URL'].rstrip('/')
+          key=os.environ['SUPABASE_SERVICE_ROLE_KEY']
+          h={'apikey':key,'Authorization':f'Bearer {key}'}
+          job_id=f"e2e-test-{os.environ['GITHUB_RUN_ID']}"
+          r=requests.get(f'{url}/rest/v1/video_jobs',headers=h,params={'id':f'eq.{job_id}','select':'id,status,stage,progress,output_path,error'},timeout=30)
+          r.raise_for_status()
+          rows=r.json()
+          print(rows)
+          if not rows or rows[0].get('status') != 'READY':
+              raise SystemExit('E2E job is not READY')
+          PY
 
