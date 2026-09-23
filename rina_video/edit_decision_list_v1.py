@@ -14,8 +14,12 @@ class EditDecisionListV1:
                           "role":c.get("stage",c.get("story_stage","MAIN")),
                           "hook_score":float(c.get("hook_score",c.get("score",0)) or 0),
                           "text":str(c.get("text","")),"speech_segments":c.get("speech_segments",[]) or []})
+        micro_paced = bool(cut_result.get("micro_paced")) and all(c.get("micro_cut") for c in cuts)
+        transition = ({"type":"hard_cut","duration":0} if micro_paced else
+                      {"type":"fade","duration":0.25} if len(shots)>1 else
+                      {"type":"none","duration":0})
         return {"version":self.VERSION,"source":source,"shots":shots,
-                "transition":{"type":"fade","duration":0.25} if len(shots)>1 else {"type":"none","duration":0},
+                "transition":transition,"micro_paced":micro_paced,
                 "quality":{"video_codec":"libx264","crf":18,"pixel_format":"yuv420p","audio_codec":"aac","audio_bitrate":"160k","sample_rate":48000},
                 "policy":"evidence_only_no_invented_speech_or_story"}
 
