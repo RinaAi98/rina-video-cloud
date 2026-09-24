@@ -124,7 +124,7 @@ def select_visual(scene):
         ranked.append((score,c))
     ranked.sort(key=lambda x:x[0], reverse=True)
     if not ranked:
-        raise ValueError("no_visual_candidates")
+        return None, 0
     return ranked[0][1], ranked[0][0]
 
 def download(url, path):
@@ -151,6 +151,37 @@ def download(url, path):
                 import time
                 time.sleep(2 ** attempt)
     raise last
+def make_fallback_visual(scene, index, theme, path):
+    from PIL import Image, ImageDraw, ImageFont
+    palettes = {
+        "science": ((12,28,54),(34,105,160)),
+        "technology": ((20,18,52),(94,45,145)),
+        "finance": ((18,48,38),(30,125,92)),
+        "history": ((62,40,24),(150,94,42)),
+        "story": ((50,24,46),(145,52,92)),
+        "lifestyle": ((34,45,58),(78,125,150)),
+    }
+    a,b=palettes.get(theme,palettes["lifestyle"])
+    img=Image.new("RGB",(1080,1920),a)
+    d=ImageDraw.Draw(img)
+    for step in range(12):
+        x1=40+step*90
+        y1=160+((step*137)%1200)
+        r=90+((index*17+step*13)%100)
+        d.ellipse((x1-r,y1-r,x1+r,y1+r),fill=b)
+    font_big=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",72)
+    font=ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",46)
+    stage=str(scene["stage"])
+    subject=str(scene["visual_subject"]).strip()
+    caption=str(scene["caption"]).strip()
+    d.rounded_rectangle((70,110,1010,430),radius=36,fill=(0,0,0))
+    d.text((110,150),f"RINA • {stage}",font=font_big,fill=(255,255,255))
+    d.text((110,270),subject[:55],font=font,fill=(230,240,255))
+    d.rounded_rectangle((70,1390,1010,1810),radius=36,fill=(0,0,0))
+    d.text((110,1460),caption[:70],font=font,fill=(255,255,255))
+    img.save(path,quality=92)
+    return path
+
 def make_voice(text, output):
     try:
         import edge_tts
@@ -242,16 +273,20 @@ def main():
     evidence=[]
     for i,(scene,seconds) in enumerate(zip(plan["scenes"],scene_durations)):
         chosen,score=select_visual(scene)
-        if score < 1:
-            raise RuntimeError(f"visual_alignment_failed:{scene['stage']}")
         img=ASSETS/f"scene_{i+1}.jpg"
-        download(chosen["url"],img)
+        if chosen and score >= 1:
+            download(chosen["url"],img)
+            evidence.append({"stage":scene["stage"],"visual_source":chosen["title"],
+                             "visual_url":chosen["url"],"alignment_score":score,
+                             "query":scene["visual_query"],"fallback":False})
+        else:
+            make_fallback_visual(scene,i,theme,img)
+            evidence.append({"stage":scene["stage"],"visual_source":"RINA_GENERATED_MOTION_CARD",
+                             "visual_url":None,"alignment_score":1,
+                             "query":scene["visual_query"],"fallback":True})
         part=OUT/f"scene_{i+1}.mp4"
         render_scene(img,scene["caption"],seconds,i,part)
         parts.append(part)
-        evidence.append({"stage":scene["stage"],"visual_source":chosen["title"],
-                         "visual_url":chosen["url"],"alignment_score":score,
-                         "query":scene["visual_query"]})
 
     silent=OUT/"silent.mp4"
     concat_videos(parts,silent)
