@@ -91,7 +91,7 @@ def wikimedia_candidates(query):
     params = {
         "action":"query","generator":"search","gsrsearch":query,
         "gsrnamespace":"6","gsrlimit":"8","prop":"imageinfo",
-        "iiprop":"url|mime|size","iiurlwidth":"1080","format":"json"
+        "iiprop":"url|mime|size","iiurlwidth":"640","format":"json"
     }
     r = requests.get("https://commons.wikimedia.org/w/api.php", params=params, timeout=30, headers={"User-Agent":"RINA-AI-Cloud/1.0 (content-generator)"})
     r.raise_for_status()
@@ -122,14 +122,29 @@ def select_visual(scene):
     return ranked[0][1], ranked[0][0]
 
 def download(url, path):
-    r=requests.get(url, timeout=60, stream=True, headers={"User-Agent":"RINA-AI-Cloud/1.0"})
-    r.raise_for_status()
-    with open(path,"wb") as f:
-        for chunk in r.iter_content(1024*128):
-            if chunk: f.write(chunk)
-    if path.stat().st_size < 5000:
-        raise ValueError("visual_file_too_small")
-    return path
+    headers={"User-Agent":"RINA-AI-Cloud/1.0 (content-generator)"}
+    last=None
+    for attempt in range(5):
+        try:
+            r=requests.get(url, timeout=60, stream=True, headers=headers)
+            if r.status_code == 429:
+                import time
+                time.sleep(2 ** attempt)
+                last=RuntimeError("visual_source_rate_limited")
+                continue
+            r.raise_for_status()
+            with open(path,"wb") as f:
+                for chunk in r.iter_content(1024*128):
+                    if chunk: f.write(chunk)
+            if path.stat().st_size < 5000:
+                raise ValueError("visual_file_too_small")
+            return path
+        except Exception as exc:
+            last=exc
+            if attempt < 4:
+                import time
+                time.sleep(2 ** attempt)
+    raise last
 def make_voice(text, output):
     try:
         import edge_tts
