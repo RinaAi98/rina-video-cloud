@@ -17,6 +17,8 @@ OUT.mkdir(parents=True, exist_ok=True)
 GROQ = os.environ["GROQ_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
+PIXABAY_API_KEY = os.getenv("PIXABAY_API_KEY", "")
 MODEL = os.getenv("RINA_CONTENT_MODEL", "openai/gpt-oss-20b")
 
 TOPICS = [
@@ -93,6 +95,39 @@ def validate_plan(plan):
         if subject and not (subject & query or subject & narration):
             raise ValueError(f"visual_subject_mismatch:{s.get('stage')}")
     return True
+def pexels_candidates(query):
+    if not PEXELS_API_KEY:
+        return []
+    r=requests.get("https://api.pexels.com/videos/search",
+                   headers={"Authorization":PEXELS_API_KEY},
+                   params={"query":query,"orientation":"portrait","size":"medium","per_page":8},
+                   timeout=30)
+    r.raise_for_status()
+    out=[]
+    for v in r.json().get("videos",[]):
+        files=sorted(v.get("video_files",[]), key=lambda x: abs((x.get("width") or 0)-1080))
+        if files:
+            f=files[0]
+            out.append({"title":v.get("url","Pexels video"),"url":f.get("link"),
+                        "mime":"video/mp4","source":"Pexels","search_text":query})
+    return [x for x in out if x.get("url")]
+
+def pixabay_candidates(query):
+    if not PIXABAY_API_KEY:
+        return []
+    r=requests.get("https://pixabay.com/api/videos/",
+                   params={"key":PIXABAY_API_KEY,"q":query,"per_page":8},
+                   timeout=30)
+    r.raise_for_status()
+    out=[]
+    for v in r.json().get("hits",[]):
+        files=v.get("videos",{})
+        f=files.get("large") or files.get("medium") or files.get("small")
+        if f and f.get("url"):
+            out.append({"title":v.get("pageURL","Pixabay video"),"url":f["url"],
+                        "mime":"video/mp4","source":"Pixabay","search_text":str(v.get("tags", ""))})
+    return out
+
 def wikimedia_candidates(query):
     params = {
         "action":"query","generator":"search","gsrsearch":query,
@@ -108,19 +143,28 @@ def wikimedia_candidates(query):
         url=info.get("thumburl") or info.get("url")
         mime=str(info.get("mime",""))
         if url and (mime.startswith("image/") or mime.startswith("video/")):
-            out.append({"title":p.get("title",""),"url":url,"mime":mime})
+            out.append({"title":p.get("title",""),"url":url,"mime":mime,"source":"Wikimedia Commons","search_text":p.get("title","")})
     return out
 
 def select_visual(scene):
     query = scene["visual_query"]
     desired = tokens(query) | tokens(scene["visual_subject"]) | tokens(scene["narration"])
-    candidates = wikimedia_candidates(query)
+    candidates=[]
+    source_errors=[]
+    for source_fn in (pexels_candidates, pixabay_candidates, wikimedia_candidates):
+        try:
+            candidates.extend(source_fn(query))
+        except Exception as exc:
+            source_errors.append(type(exc).__name__)
     if not candidates:
-        # second pass: subject only, still source-grounded
-        candidates = wikimedia_candidates(scene["visual_subject"])
+        for source_fn in (pexels_candidates, pixabay_candidates, wikimedia_candidates):
+            try:
+                candidates.extend(source_fn(scene["visual_subject"]))
+            except Exception as exc:
+                source_errors.append(type(exc).__name__)
     ranked=[]
     for c in candidates:
-        score = len(desired & tokens(c["title"]))
+        score = len(desired & tokens(c.get("search_text", c.get("title",""))))
         ranked.append((score,c))
     ranked.sort(key=lambda x:x[0], reverse=True)
     if not ranked:
