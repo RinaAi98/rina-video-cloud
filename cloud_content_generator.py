@@ -93,7 +93,7 @@ def wikimedia_candidates(query):
         "gsrnamespace":"6","gsrlimit":"8","prop":"imageinfo",
         "iiprop":"url|mime|size","iiurlwidth":"1080","format":"json"
     }
-    r = requests.get("https://commons.wikimedia.org/w/api.php", params=params, timeout=30)
+    r = requests.get("https://commons.wikimedia.org/w/api.php", params=params, timeout=30, headers={"User-Agent":"RINA-AI-Cloud/1.0 (content-generator)"})
     r.raise_for_status()
     pages = r.json().get("query",{}).get("pages",{})
     out=[]
@@ -253,11 +253,11 @@ def main():
         "status":"READY_FOR_REVIEW",
         "storage_path":remote
     }
-    upload_supabase(final,remote,"video/mp4")
+    video_url=upload_supabase(final,remote,"video/mp4")
     meta=WORK/"manifest.json"
     meta.write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
     upload_supabase(meta,meta_remote,"application/json")
-    print(json.dumps({"status":"READY_FOR_REVIEW","video_url":upload_supabase(final,remote,"video/mp4"),
+    print(json.dumps({"status":"READY_FOR_REVIEW","video_url":video_url,
                       "manifest":manifest},ensure_ascii=False))
 
 if __name__=="__main__":
