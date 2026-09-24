@@ -17,7 +17,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 GROQ = os.environ["GROQ_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-MODEL = os.getenv("RINA_CONTENT_MODEL", "llama-3.3-70b-versatile")
+MODEL = os.getenv("RINA_CONTENT_MODEL", "openai/gpt-oss-20b")
 
 TOPICS = [
     ("science", "Fenomena sains sehari-hari yang terlihat biasa tetapi punya penjelasan mengejutkan"),
