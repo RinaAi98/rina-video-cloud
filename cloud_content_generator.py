@@ -284,10 +284,17 @@ def main():
         chosen,score=select_visual(scene)
         img=ASSETS/f"scene_{i+1}.jpg"
         if chosen and score >= 1:
-            download(chosen["url"],img)
-            evidence.append({"stage":scene["stage"],"visual_source":chosen["title"],
-                             "visual_url":chosen["url"],"alignment_score":score,
-                             "query":scene["visual_query"],"fallback":False})
+            try:
+                download(chosen["url"],img)
+                evidence.append({"stage":scene["stage"],"visual_source":chosen["title"],
+                                 "visual_url":chosen["url"],"alignment_score":score,
+                                 "query":scene["visual_query"],"fallback":False})
+            except Exception as visual_error:
+                make_fallback_visual(scene,i,theme,img)
+                evidence.append({"stage":scene["stage"],"visual_source":"RINA_GENERATED_MOTION_CARD",
+                                 "visual_url":None,"alignment_score":1,
+                                 "query":scene["visual_query"],"fallback":True,
+                                 "external_error":type(visual_error).__name__})
         else:
             make_fallback_visual(scene,i,theme,img)
             evidence.append({"stage":scene["stage"],"visual_source":"RINA_GENERATED_MOTION_CARD",
