@@ -76,6 +76,12 @@ def validate_plan(plan):
         raise ValueError("story_structure_invalid")
     if len(tokens(plan.get("title"))) < 2:
         raise ValueError("title_too_weak")
+    if not str(plan.get("cta","")).strip():
+        plan["cta"] = "Kalau kamu suka cerita seperti ini, follow RINA untuk video berikutnya."
+    if not str(plan.get("caption","")).strip():
+        plan["caption"] = plan.get("title","RINA AI")
+    if not isinstance(plan.get("hashtags"), list):
+        plan["hashtags"] = ["#RINAAI", "#edukasi", "#fakta"]
     for s in scenes:
         if len(tokens(s.get("narration"))) < 5:
             raise ValueError(f"scene_narration_too_short:{s.get('stage')}")
