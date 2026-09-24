@@ -266,7 +266,7 @@ def main():
     if voice_dur < 45.0 or voice_dur > 60.0:
         target_voice=45.0 if voice_dur < 45.0 else 60.0
         factor=voice_dur/target_voice
-        normalized=WORK/"voice_normalized.mp3"
+        normalized=WORK/"voice_normalized.m4a"
         subprocess.run(["ffmpeg","-y","-i",str(voice),"-filter:a",f"atempo={factor:.6f}",
                         "-c:a","aac","-b:a","160k",str(normalized)],check=True,timeout=120,
                        stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
