@@ -36,7 +36,7 @@ def groq_plan(theme_hint, seed):
 WAJIB: setiap scene harus punya hubungan visual langsung dengan kalimat narasinya. Jangan memakai visual generik jika ada subjek spesifik.
 Buat 6 scene: HOOK, SETUP, TENSION, DEVELOPMENT, REVEAL, PAYOFF. CTA ditambahkan di akhir.
 Gunakan bahasa Indonesia natural, kalimat pendek, ritme berubah, dan hindari template berulang.
-Visual query harus konkret dan dapat dicari sebagai foto/video nyata: objek, tempat, aktivitas, atau fenomena yang disebut scene.
+Visual query WAJIB berupa frasa kata kunci BAHASA INGGRIS yang konkret dan dapat dicari sebagai foto/video nyata: objek, tempat, aktivitas, atau fenomena yang disebut scene. Jangan memakai kalimat panjang.
 Jangan mengarang fakta spesifik yang tidak perlu. Jika topik faktual, gunakan framing edukatif dan hindari angka/detail yang tidak yakin."""
     user = f"""Tema rotasi: {theme_hint}
 Seed hari ini: {seed}
