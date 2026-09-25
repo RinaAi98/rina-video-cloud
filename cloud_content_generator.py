@@ -278,8 +278,10 @@ def render_scene(image, caption, seconds, index, output):
         safe_cmd=["ffmpeg","-y","-loop","1","-i",str(image),"-vf",safe_vf,
                   "-frames:v",str(frames),"-an","-c:v","libx264","-preset","veryfast",
                   "-crf","21","-pix_fmt","yuv420p",str(output)]
-        subprocess.run(safe_cmd,check=True,timeout=120,stdout=subprocess.DEVNULL,
-                       stderr=subprocess.PIPE)
+        safe_run=subprocess.run(safe_cmd,check=False,timeout=120,stdout=subprocess.DEVNULL,
+                               stderr=subprocess.PIPE,text=True)
+        if safe_run.returncode != 0:
+            raise RuntimeError(f"FFmpeg scene render failed: {safe_run.stderr[-4000:]}")
 
 def concat_videos(parts, output):
     listing=WORK/"concat.txt"
