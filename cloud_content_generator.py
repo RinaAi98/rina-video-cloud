@@ -248,22 +248,24 @@ def render_scene(image, caption, seconds, index, output):
     # Ken-Burns style motion makes still visuals active instead of static slides.
     textfile=output.with_suffix(".txt")
     textfile.write_text(caption[:90], encoding="utf-8")
-    zoom=f"min(zoom+0.0007,1.12)" if index % 2 == 0 else f"max(zoom-0.0007,1.0)"
+    frames=max(1,int(round(seconds*30)))
+    zoom=(f"min(1+0.0007*on,1.12)" if index % 2 == 0
+          else f"max(1.12-0.0007*on,1.0)")
     vf=(
       "scale=1080:1920:force_original_aspect_ratio=increase,"
       "crop=1080:1920,"
       f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-      f"d={max(1,int(round(seconds*30)))}:s=1080x1920:fps=30,"
+      f"d={frames}:s=1080x1920:fps=30,"
       "eq=contrast=1.04:saturation=1.06,"
       f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
       f"textfile='{textfile}':fontcolor=white:fontsize=52:"
       "x=(w-text_w)/2:y=h-text_h-280:box=1:boxcolor=black@0.62:boxborderw=26,"
       "format=yuv420p"
     )
-    subprocess.run(["ffmpeg","-y","-loop","1","-i",str(image),"-t",f"{seconds:.3f}",
-                    "-vf",vf,"-an","-c:v","libx264","-preset","veryfast","-crf","21",
-                    "-pix_fmt","yuv420p",str(output)],check=True,timeout=120,
-                   stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+    subprocess.run(["ffmpeg","-y","-loop","1","-i",str(image),
+                    "-vf",vf,"-frames:v",str(frames),"-an","-c:v","libx264",
+                    "-preset","veryfast","-crf","21","-pix_fmt","yuv420p",str(output)],
+                   check=True,timeout=120,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
 
 def concat_videos(parts, output):
     listing=WORK/"concat.txt"
