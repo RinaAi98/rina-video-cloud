@@ -262,10 +262,24 @@ def render_scene(image, caption, seconds, index, output):
       "x=(w-text_w)/2:y=h-text_h-280:box=1:boxcolor=black@0.62:boxborderw=26,"
       "format=yuv420p"
     )
-    subprocess.run(["ffmpeg","-y","-loop","1","-i",str(image),
-                    "-vf",vf,"-frames:v",str(frames),"-an","-c:v","libx264",
-                    "-preset","veryfast","-crf","21","-pix_fmt","yuv420p",str(output)],
-                   check=True,timeout=120,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+    cmd=["ffmpeg","-y","-loop","1","-i",str(image),
+         "-vf",vf,"-frames:v",str(frames),"-an","-c:v","libx264",
+         "-preset","veryfast","-crf","21","-pix_fmt","yuv420p",str(output)]
+    try:
+        subprocess.run(cmd,check=True,timeout=120,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as exc:
+        # Cloud FFmpeg builds can differ in zoompan behavior; retry with a conservative filter.
+        safe_vf=("scale=1080:1920:force_original_aspect_ratio=increase,"
+                 "crop=1080:1920,"
+                 f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+                 f"textfile='{textfile}':fontcolor=white:fontsize=52:"
+                 "x=(w-text_w)/2:y=h-text_h-280:box=1:boxcolor=black@0.62:boxborderw=26,"
+                 "format=yuv420p")
+        safe_cmd=["ffmpeg","-y","-loop","1","-i",str(image),"-vf",safe_vf,
+                  "-frames:v",str(frames),"-an","-c:v","libx264","-preset","veryfast",
+                  "-crf","21","-pix_fmt","yuv420p",str(output)]
+        subprocess.run(safe_cmd,check=True,timeout=120,stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE)
 
 def concat_videos(parts, output):
     listing=WORK/"concat.txt"
